@@ -17,6 +17,10 @@ Independent of JMStudio; uses your own `calib.txt`.
 ## Optional: --guided
 `--guided` adds a second pass that predicts each stripe's depth from the fused model and decodes with that hint, writing `fused_guided.ply`. On the test scene it gave about 3x the points and raised the share of the vendor scan's surface covered to within 2 mm from 57% to 70%, but its points are a little less accurate (median distance to the vendor scan 1.2 mm instead of 0.9 mm). It only fills in surfaces the model already has; it cannot find new geometry.
 
+## Meshing (experimental)
+`python3 mesh.py OUT_DIR --no-mesh` writes `points_normals.ply`: the fused points with normals oriented towards the cameras that saw them. Open it in MeshLab (Filters > Remeshing > Screened Poisson) or Open3D to get a surface.
+Without `--no-mesh` it also writes a rough `mesh.obj` (needs scikit-image). That mesh is **not good yet**: on the test scene the vertices were a median 3 mm from the vendor scan (the cloud itself is 0.9 mm), so it adds surface where there are no points. Use the Poisson route for now.
+
 ## Assumptions (what it will NOT handle yet)
 * Scanner fixed; object on a base turned by hand around ONE fixed axis. The object must turn 10-60 degrees in the first ~30 frames so the axis can be estimated.
 * Object closer than 40 cm, background further than about 45 cm (it separates them by depth).
