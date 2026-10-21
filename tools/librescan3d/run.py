@@ -24,7 +24,10 @@ rows,xr=T.load_ref(os.path.join(here,"ref30.csv"))
 fs=sorted(glob.glob(os.path.join(dec,"d_*_samples.npy"))); P=[T.sample_points(f,rows,xr) for f in fs]
 print("object points per frame (median):",int(np.median([0 if p is None else len(p) for p in P])))
 ax,pv=T.estimate_axis(P); print("turning axis",np.round(ax,3),"pivot",np.round(pv,1))
-th,tf=T.track(P,ax,pv); print("total turn %.0f deg (max angle %.0f)"%(np.degrees(th[-1]),np.degrees(np.abs(th).max())))
-X=np.vstack([tf(p,th[k]) for k,p in enumerate(P) if p is not None])
+th,tf,q=T.track(P,ax,pv); print("total turn %.0f deg (max angle %.0f)"%(np.degrees(th[-1]),np.degrees(np.abs(th).max())))
+np.savetxt(os.path.join(a.out,"quality.csv"),np.array([(k,o,r,int(ok)) for k,(o,r,ok) in enumerate(q)]),fmt=["%d","%.3f","%.3f","%d"],header="frame_index,overlap,rms_mm,tracking_ok",delimiter=",")
+lost=[k for k,(o,r,ok) in enumerate(q) if not ok]
+print("tracking quality: %d of %d frames flagged LOST (overlap<0.6 or rms>2.0 mm)"%(len(lost),len(q)),lost[:40])
+X=np.vstack([tf(p,th[k]) for k,p in enumerate(P) if p is not None and q[k][2]])
 T.write_ply(os.path.join(a.out,"fused.ply"),X); np.savetxt(os.path.join(a.out,"angles_deg.csv"),np.degrees(th),fmt="%.2f")
 print("wrote",os.path.join(a.out,"fused.ply"),len(X),"points")
