@@ -1,0 +1,12 @@
+# device-specific and personal data: never commit
+calib*.txt
+*.rscan
+*.rscan.zip
+*.obj
+*.ply
+*.npy
+f_*.png
+samples/
+out/
+__pycache__/
+.DS_Store
