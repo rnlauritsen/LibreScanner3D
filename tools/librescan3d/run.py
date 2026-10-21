@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 import track as T
 here=os.path.dirname(os.path.abspath(__file__))
 ap=argparse.ArgumentParser(); ap.add_argument("frames"); ap.add_argument("calib"); ap.add_argument("out")
+ap.add_argument("--guided",action="store_true",help="second pass: model-guided decoding (denser, needs the fused model)")
 ap.add_argument("--step",type=int,default=3,help="use every Nth frame"); ap.add_argument("--jobs",type=int,default=4)
 a=ap.parse_args(); a.frames,a.calib,a.out=[os.path.abspath(x) for x in (a.frames,a.calib,a.out)]; os.makedirs(a.out,exist_ok=True); dec=os.path.join(a.out,"samples"); os.makedirs(dec,exist_ok=True)
 frames=sorted(glob.glob(os.path.join(a.frames,"f_*.png")))[::a.step]
@@ -31,3 +32,22 @@ print("tracking quality: %d of %d frames flagged LOST (overlap<0.6 or rms>2.0 mm
 X=np.vstack([tf(p,th[k]) for k,p in enumerate(P) if p is not None and q[k][2]])
 T.write_ply(os.path.join(a.out,"fused.ply"),X); np.savetxt(os.path.join(a.out,"angles_deg.csv"),np.degrees(th),fmt="%.2f")
 print("wrote",os.path.join(a.out,"fused.ply"),len(X),"points")
+
+if a.guided:
+    import guided as G
+    from scipy.spatial import cKDTree
+    M=G.plyload(os.path.join(a.out,"fused.ply")); ok_frames=[k for k,(o,r_,ok) in enumerate(q)]
+    names=sorted(glob.glob(os.path.join(a.frames,"f_*.png")))[::a.step]
+    def rot(t):
+        K=np.array([[0,-ax[2],ax[1]],[ax[2],0,-ax[0]],[-ax[1],ax[0],0]]); return np.eye(3)+np.sin(t)*K+(1-np.cos(t))*K@K
+    out=[]
+    for k,f in enumerate(names[:len(q)]):
+        if not q[k][2]: continue
+        S=G.run(f,G.pred_depth(M,th[k],ax,pv),rows,xr)
+        if len(S)<10: continue
+        xu,yu=T.und(S[:,1],S[:,0]); Z=S[:,3]; X=np.c_[xu*Z,yu*Z,Z]
+        out.append((X-pv)@rot(th[k]).T+pv)
+    Fg=np.vstack(out)
+    # drop isolated points (fewer than 3 neighbours within 2 mm)
+    cnt=np.array([len(x) for x in cKDTree(Fg).query_ball_point(Fg,2.0)]); Fg=Fg[cnt>=4]
+    T.write_ply(os.path.join(a.out,"fused_guided.ply"),Fg); print("guided: wrote fused_guided.ply",len(Fg),"points")

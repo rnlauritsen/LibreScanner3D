@@ -10,8 +10,12 @@ Independent of JMStudio; uses your own `calib.txt`.
     python3 run.py FRAMES_DIR /path/to/calib.txt OUT_DIR [--step 3] [--jobs 4]
 
 * FRAMES_DIR: `f_0001.png, f_0002.png ...` striped frames recorded with the capture script (exposure 25, gain 0).
-* OUT_DIR gets `samples/` (per-frame depth), `fused.ply`, `angles_deg.csv`.
+* OUT_DIR gets `samples/` (per-frame depth), `fused.ply`, `angles_deg.csv` and `quality.csv`.
+* `quality.csv` has one row per frame: overlap with the model so far, leftover error (mm) and `tracking_ok`. Frames flagged lost (overlap < 0.6 or error > 2 mm) are not added to the model; the run prints which ones. If the turning axis cannot be estimated reliably, the run stops with an error instead of producing a bad model.
 * About 8 minutes for 300 frames at --step 3 on the test machine. Decoding is the slow part and is cached in `samples/`.
+
+## Optional: --guided
+`--guided` adds a second pass that predicts each stripe's depth from the fused model and decodes with that hint, writing `fused_guided.ply`. On the test scene it gave about 3x the points and raised the share of the vendor scan's surface covered to within 2 mm from 57% to 70%, but its points are a little less accurate (median distance to the vendor scan 1.2 mm instead of 0.9 mm). It only fills in surfaces the model already has; it cannot find new geometry.
 
 ## Assumptions (what it will NOT handle yet)
 * Scanner fixed; object on a base turned by hand around ONE fixed axis. The object must turn 10-60 degrees in the first ~30 frames so the axis can be estimated.
