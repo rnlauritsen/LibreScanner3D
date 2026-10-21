@@ -78,29 +78,39 @@ def estimate_axis(P):
         if ang>60: break
     if len(ax)<3: raise RuntimeError("could not estimate the turning axis: the object did not turn 10-60 degrees in the first frames")
     a=np.median(ax,0); a/=np.linalg.norm(a); p=np.median(pv,0); p=p-(p@a)*a
+    spread=np.degrees(np.arccos(np.clip(np.min([abs(x@a) for x in ax]),-1,1)))
+    if np.linalg.norm(p)>1500 or not (200<p[2]<800) or spread>25:
+        raise RuntimeError("turning-axis estimate is unreliable (pivot %s mm, axis spread %.0f deg): the object probably did not turn about a fixed axis, or turned too little/too fast in the first frames"%(np.round(p,0),spread))
     return a,p
 
-def track(P,a,p):
+def track(P,a,p,min_overlap=0.6,max_rms=2.0):
     def rot(th):
         K=np.array([[0,-a[2],a[1]],[a[2],0,-a[0]],[-a[1],a[0],0]]); return np.eye(3)+np.sin(th)*K+(1-np.cos(th))*K@K
     tf=lambda X,th:(X-p)@rot(th).T+p
     first=next(k for k,x in enumerate(P) if x is not None)
     model=[P[first]]; th=[0.0]*(first+1); last=0.0
+    q=[(1.0,0.0,True)]*(first+1)   # per frame: overlap fraction, rms (mm), tracking ok
     def rebuild():
         Mp=np.vstack(model); Mn=normals(Mp); return Mp,Mn,cKDTree(Mp)
     Mp,Mn,Mt=rebuild()
     for k in range(first+1,len(P)):
         X=P[k]
-        if X is None or len(X)<30: th.append(last); continue
+        if X is None or len(X)<30: th.append(last); q.append((0.0,float('nan'),False)); continue
         def cost(t):
             Y=tf(X,t); d,i=Mt.query(Y); m=d<6
             if m.sum()<20: return 9.0
             r=((Y[m]-Mp[i[m]])*Mn[i[m]]).sum(1); return np.mean(np.minimum(r*r,4.0))+0.5*(1-m.mean())
         cands=last+np.radians(np.arange(-8,8.01,0.5)); c0=cands[int(np.argmin([cost(c) for c in cands]))]
         t=minimize_scalar(cost,bounds=(c0-np.radians(0.6),c0+np.radians(0.6)),method='bounded').x
-        th.append(t); last=t; model.append(tf(X,t))
-        if k%5==0: Mp,Mn,Mt=rebuild()
-    return np.array(th),tf
+        Y=tf(X,t); d,i=Mt.query(Y); m=d<6
+        ov=float(m.mean()); rms=float(np.sqrt(np.mean(((Y[m]-Mp[i[m]])*Mn[i[m]]).sum(1)**2))) if m.sum()>=10 else float('nan')
+        ok=bool(ov>=min_overlap and rms<=max_rms)
+        th.append(t); q.append((ov,rms,ok))
+        last=t                       # the angle prior always follows the frame ...
+        if ok:                       # ... but only well-tracked frames are added to the model
+            model.append(Y)
+            if k%5==0: Mp,Mn,Mt=rebuild()
+    return np.array(th),tf,q
 
 def write_ply(path,X,N=None):
     with open(path,'wb') as f:
