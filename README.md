@@ -3,6 +3,17 @@
 Raw striped frames from the Fox scanner -> depth -> tracked, fused point cloud (PLY).
 Independent of JMStudio; uses your own `calib.txt`.
 
+## Quick start: one command from frames to mesh
+    python3 scan.py REC1 [REC2 ...] --calib calib.txt --out OUT [--depth 8] [--voxel 0.4]
+Each REC is a folder of `f_0001.png ...` (one turntable recording). `scan.py` runs `run.py` (decode + track + `--dense`), `mesh.py --no-mesh` (crop to the figure, normals), `merge.py` (when you give several recordings) and `poisson.py` (Poisson + trim + smoothing), and writes `OUT/poisson_mesh.ply`. Finished steps are skipped on a re-run. Needs `numpy scipy pillow` and, for the last step, `open3d` (Python 3.9-3.12).
+
+### Several recordings of one object
+One turntable pass cannot see the top or underside. Record the object in two or three different poses and give all folders to `scan.py`; `merge.py` aligns them without markers. Tested: two passes of a larger figure fell onto each other within 0.4 mm (median).
+* **The poses must share at least about half of their surface.** On synthetic tests (a real scan cut into two overlapping parts and moved by a known motion) the alignment was correct at 70% and 50% shared surface (0.3 mm error) and failed at 35% and below. So tilt the object 40-60 degrees between recordings rather than laying it completely on another side.
+* A recording in almost the same pose adds points but no new surface (the merge then reports a rotation of only a few degrees).
+* `merge.py` prints how much of the second scan lies within 2 mm of the first and warns below 50%. `--fpfh` (Open3D feature matching) and `--partial` are experimental options for small overlaps; neither was verified to fix the 35% case.
+* Ideas taken from FoxStudio's registration (point-to-plane ICP) improved the fit from 83% to 88% of points within 2 mm.
+
 ## Install (macOS, Apple Silicon)
     python3 -m pip install numpy scipy pillow
 
@@ -17,9 +28,14 @@ Independent of JMStudio; uses your own `calib.txt`.
 ## Optional: --guided
 `--guided` adds a second pass that predicts each stripe's depth from the fused model and decodes with that hint, writing `fused_guided.ply`. On the test scene it gave about 3x the points and raised the share of the vendor scan's surface covered to within 2 mm from 57% to 70%, but its points are a little less accurate (median distance to the vendor scan 1.2 mm instead of 0.9 mm). It only fills in surfaces the model already has; it cannot find new geometry.
 
+## Optional: --dense
+`--dense` fills in depth between neighbouring decoded stripes (only where the surface is smooth, within 1.5 mm) and writes `fused_dense.ply/.npz`: about 4x the points. Against the vendor scan its accuracy was the same as the normal cloud (median 0.93 mm); it does not add coverage, it removes the stripe-pattern ridges that otherwise show up in a mesh.
+
 ## Meshing (experimental)
 `python3 mesh.py OUT_DIR --no-mesh` writes `points_normals.ply`: the fused points with normals oriented towards the cameras that saw them. Open it in MeshLab (Filters > Remeshing > Screened Poisson) or Open3D to get a surface.
 Without `--no-mesh` it also writes a rough `mesh.obj` (needs scikit-image). That mesh is **not good yet**: on the test scene the vertices were a median 3 mm from the vendor scan (the cloud itself is 0.9 mm), so it adds surface where there are no points. Use the Poisson route for now.
+
+`poisson.py OUT_DIR` does the Poisson step with Open3D (`pip install open3d`) and trims surface invented over gaps. Untested by the author so far.
 
 ## Assumptions (what it will NOT handle yet)
 * Scanner fixed; object on a base turned by hand around ONE fixed axis. The object must turn 10-60 degrees in the first ~30 frames so the axis can be estimated.
