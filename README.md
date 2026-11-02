@@ -1,4 +1,4 @@
-# libreScanner3D (prototype)
+# LibreScanner3D (prototype)
 
 Raw striped frames from the Fox scanner -> depth -> tracked, fused point cloud (PLY).
 Independent of JMStudio; uses your own `calib.txt`.
