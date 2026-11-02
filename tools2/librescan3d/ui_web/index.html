@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LibreScanner3D</title>
+<link rel="stylesheet" href="/static/style.css">
+<script>window.TOKEN="__TOKEN__";</script>
+</head><body>
+<header>
+  <div class="brand">LibreScanner<b>3D</b></div>
+  <nav id="tabs">
+    <button data-tab="scan" class="on">Scan</button><button data-tab="view">Viewer</button><button data-tab="track">Tracking</button><button data-tab="tools">Tools</button><button data-tab="settings">Settings</button>
+  </nav>
+  <button id="quit" class="ghost" title="Stop the program">Quit</button>
+</header>
+<main>
+<section id="scan" class="tab on">
+  <div class="card">
+    <h2>1. Recordings</h2>
+    <p class="hint">One folder of frames per pose. Add several poses of the same object to merge them into one mesh (they need to share about half of their surface).</p>
+    <div id="recs"></div>
+    <button id="addrec">+ Add recording folder…</button>
+  </div>
+  <div class="card grid2">
+    <div><h2>2. Calibration</h2><div class="pathrow"><input id="s_calib"><button data-pick="file" data-target="s_calib">Choose…</button></div></div>
+    <div><h2>3. Output folder</h2><div class="pathrow"><input id="s_out"><button data-pick="dir" data-target="s_out">Choose…</button></div></div>
+  </div>
+  <div class="card">
+    <h2>Options</h2>
+    <div class="opts">
+      <label>Use every Nth frame<input id="s_step" type="number" min="1" value="3"></label>
+      <label>Poisson depth<input id="s_depth" type="number" min="6" max="11" value="8"></label>
+      <label>Voxel (mm)<input id="s_voxel" type="number" step="0.1" min="0.1" value="0.4"></label>
+      <label>CPU jobs<input id="s_jobs" type="number" min="1" max="16" value="4"></label>
+      <label class="chk"><input id="s_nop" type="checkbox"> Skip meshing (cloud only)</label>
+    </div>
+    <div class="row"><button id="s_run" class="primary">Start scan</button><span id="s_msg" class="hint"></span></div>
+  </div>
+</section>
+
+<section id="view" class="tab">
+  <div class="vwrap">
+    <aside>
+      <div class="row"><b>Results</b><button id="v_refresh" class="ghost">Refresh</button></div>
+      <div id="v_list" class="list"></div>
+      <button id="v_open">Open file…</button>
+      <h3>Display</h3>
+      <label>Colour<select id="v_mode"><option value="normal">Normal</option><option value="height">Height</option><option value="flat">Flat</option></select></label>
+      <label>Style<select id="v_style"><option value="solid">Solid</option><option value="points">Points</option></select></label>
+      <label>Point size<input id="v_ps" type="range" min="1" max="8" value="3"></label>
+      <button id="v_reset" class="ghost">Reset view</button>
+      <p class="hint">Drag = rotate · right-drag / Shift-drag = pan · wheel = zoom · double-click = reset. Dark patches on a mesh are back faces (surface seen from inside).</p>
+    </aside>
+    <div class="canvaswrap"><canvas id="gl"></canvas><div id="v_info" class="overlay"></div></div>
+  </div>
+</section>
+
+<section id="track" class="tab">
+  <div class="card">
+    <div class="row"><b>Result folder</b><select id="t_sel"></select><button id="t_load">Load</button></div>
+    <div id="t_sum" class="hint"></div>
+  </div>
+  <div class="tgrid">
+    <div class="card"><h3>Angle per frame (°)</h3><canvas id="c_ang" height="170"></canvas></div>
+    <div class="card"><h3>Overlap (0–1) and RMS (mm)</h3><canvas id="c_q" height="170"></canvas></div>
+    <div class="card framecard"><h3>Source frame <span id="t_fi"></span></h3><input id="t_slider" type="range" min="0" max="0" value="0"><img id="t_img" alt=""><div id="t_fq" class="hint"></div></div>
+  </div>
+</section>
+
+<section id="tools" class="tab">
+  <div class="card"><h2>Merge two scans</h2>
+    <p class="hint">Result folders that contain <code>points_normals.ply</code>. B is moved onto A, then mesh the output with “Mesh only”.</p>
+    <div class="pathrow"><input id="m_a" placeholder="scan A folder"><button data-pick="dir" data-target="m_a">Choose…</button></div>
+    <div class="pathrow"><input id="m_b" placeholder="scan B folder"><button data-pick="dir" data-target="m_b">Choose…</button></div>
+    <div class="pathrow"><input id="m_out" placeholder="output folder"><button data-pick="dir" data-target="m_out">Choose…</button></div>
+    <div class="row"><label class="chk"><input id="m_partial" type="checkbox"> Small overlap (slower)</label><label class="chk"><input id="m_fpfh" type="checkbox"> Feature matching (needs Open3D, experimental)</label><button id="m_run" class="primary">Merge</button></div>
+  </div>
+  <div class="card"><h2>Mesh only (Poisson)</h2>
+    <div class="pathrow"><input id="p_dir" placeholder="folder with points_normals.ply"><button data-pick="dir" data-target="p_dir">Choose…</button></div>
+    <div class="opts"><label>Depth<input id="p_depth" type="number" value="8" min="6" max="11"></label><label>Voxel (mm)<input id="p_voxel" type="number" step="0.1" value="0.4"></label><label>Trim<input id="p_trim" type="number" step="0.01" value="0.05"></label><label>Smooth passes<input id="p_smooth" type="number" value="10"></label></div>
+    <button id="p_run" class="primary">Mesh</button>
+  </div>
+  <div class="card"><h2>Compare with a reference mesh (e.g. JMStudio)</h2>
+    <div class="pathrow"><input id="c_a" placeholder="our scan (.ply)"><button data-pick="file" data-target="c_a">Choose…</button></div>
+    <div class="pathrow"><input id="c_b" placeholder="reference (.ply/.obj)"><button data-pick="file" data-target="c_b">Choose…</button></div>
+    <button id="c_run" class="primary">Compare</button>
+  </div>
+  <div class="card"><h2>Speed test</h2><p class="hint">Re-tracks a finished scan using fewer frames to show how fast the object may turn.</p>
+    <div class="pathrow"><input id="sp_dir" placeholder="result folder"><button data-pick="dir" data-target="sp_dir">Choose…</button></div>
+    <button id="sp_run" class="primary">Run speed test</button>
+  </div>
+  <div class="card"><h2>Record from the scanner</h2><p class="hint">Uses the recorder script set in Settings.</p>
+    <div class="pathrow"><input id="r_out" placeholder="folder for the new recording"><button data-pick="dir" data-target="r_out">Choose…</button></div>
+    <button id="r_run" class="primary">Start recording</button>
+  </div>
+</section>
+
+<section id="settings" class="tab">
+  <div class="card"><h2>Settings</h2>
+    <label>Default calibration file<div class="pathrow"><input id="c_calib"><button data-pick="file" data-target="c_calib">Choose…</button></div></label>
+    <label>Work folder (results are listed from here)<div class="pathrow"><input id="c_work"><button data-pick="dir" data-target="c_work">Choose…</button></div></label>
+    <label>Recorder script (record.sh or a .py)<div class="pathrow"><input id="c_rec"><button data-pick="file" data-target="c_rec">Choose…</button></div></label>
+    <button id="c_save" class="primary">Save</button> <span id="c_msg" class="hint"></span>
+    <p class="hint" id="c_info"></p>
+  </div>
+</section>
+</main>
+
+<div id="drawer" class="closed">
+  <div class="dhead"><b id="d_title">No job</b><span id="d_status" class="badge"></span><div class="sp"></div><button id="d_stop" class="ghost" hidden>Stop</button><button id="d_open" class="ghost" hidden>Open result</button><button id="d_toggle" class="ghost">Log ▴</button></div>
+  <div id="d_stages"></div>
+  <pre id="d_log"></pre>
+</div>
+
+<div id="modal" hidden><div class="mbox">
+  <div class="row"><b id="mo_title">Choose</b><div class="sp"></div><button id="mo_close" class="ghost">✕</button></div>
+  <div id="mo_path" class="hint"></div><div id="mo_list" class="list tall"></div>
+  <div class="row"><button id="mo_up">↑ Up</button><button id="mo_new">New folder…</button><div class="sp"></div><button id="mo_ok" class="primary">Use this folder</button></div>
+</div></div>
+<script src="/static/viewer.js"></script><script src="/static/app.js"></script>
+</body></html>

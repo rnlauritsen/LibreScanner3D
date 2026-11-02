@@ -1,7 +1,6 @@
-"""usage: python3 refine.py OUT_DIR CALIB.txt
-Pose refinement experiment: starting from the fixed-axis tracking, let every frame correct its pose in all six degrees of freedom
+"""Pose refinement experiment: starting from the fixed-axis tracking, let every frame correct its pose in all six degrees of freedom
 against all the other frames (point-to-plane ICP, small steps only), a few passes. Reports how well the frames agree before/after."""
-import numpy as np, glob, sys, time
+import os, numpy as np, glob, sys, time
 from scipy.spatial import cKDTree
 import track as T
 
@@ -47,14 +46,14 @@ def refine(W,passes=3,maxrot=np.radians(1.5),maxtr=2.0,minpts=40):
     return W,poses
 
 if __name__=="__main__":
-    run=sys.argv[1]; calib=sys.argv[2]
-    T.load_camera(calib); rows,xr=T.load_ref('ref30.csv')
-    fs=sorted(glob.glob('%s/samples/d_*_samples.npy'%run)); P=[T.sample_points(f,rows,xr) for f in fs]
-    tk=np.load('%s/tracking.npz'%run); ang=np.radians(np.loadtxt('%s/angles_deg.csv'%run))
+    run=sys.argv[1]; calib='/root/.claude/uploads/b724fa22-1a23-595b-ad62-1994bc7e8bb3/35f6e8c1-calib.txt'
+    T.load_camera(calib); rows,xr=T.load_ref(os.path.join(os.path.dirname(os.path.abspath(__file__)),'ref30.csv'))
+    fs=sorted(glob.glob('../../%s/samples/d_*_samples.npy'%run)); P=[T.sample_points(f,rows,xr) for f in fs]
+    tk=np.load('../../%s/tracking.npz'%run); ang=np.radians(np.loadtxt('../../%s/angles_deg.csv'%run))
     W=world_points(P,ang,tk['axis'],tk['pivot'])
     r0=residuals(W); print("before: median frame-to-frame residual %.3f mm (mean of per-frame medians), 90th pct %.3f"%(np.nanmean(list(r0.values())),np.nanpercentile(list(r0.values()),90)))
     t0=time.time(); W2,poses=refine(W); r1=residuals(W2)
     print("after : median frame-to-frame residual %.3f mm, 90th pct %.3f   (%.0fs)"%(np.nanmean(list(r1.values())),np.nanpercentile(list(r1.values()),90),time.time()-t0))
     rots=[np.degrees(np.arccos(np.clip((np.trace(R)-1)/2,-1,1))) for R,t in poses]; trs=[np.linalg.norm(t) for R,t in poses]
     print("corrections: median %.2f deg / %.2f mm, max %.2f deg / %.2f mm"%(np.median(rots),np.median(trs),max(rots),max(trs)))
-    np.savez('%s/refined_poses.npz'%run,R=np.array([p[0] for p in poses]),t=np.array([p[1] for p in poses]))
+    np.savez('../../%s/refined_poses.npz'%run,R=np.array([p[0] for p in poses]),t=np.array([p[1] for p in poses]))

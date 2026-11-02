@@ -26,7 +26,8 @@ rows,xr=T.load_ref(os.path.join(here,"ref30.csv"))
 fs=sorted(glob.glob(os.path.join(dec,"d_*_samples.npy"))); P=[T.sample_points(f,rows,xr) for f in fs]
 print("object points per frame (median):",int(np.median([0 if p is None else len(p) for p in P])))
 ax,pv=T.estimate_axis(P[::a.axis_step]); print("turning axis",np.round(ax,3),"pivot",np.round(pv,1))
-np.savez(os.path.join(a.out,"tracking.npz"),axis=ax,pivot=pv)   # used by mesh.py to crop the figure
+np.savez(os.path.join(a.out,"tracking.npz"),axis=ax,pivot=pv)
+import json; json.dump({"frames":os.path.abspath(a.frames),"step":a.step},open(os.path.join(a.out,"source.json"),"w"))   # lets the interface show the recorded frames next to the results   # used by mesh.py to crop the figure
 th,tf,q=T.track(P,ax,pv); print("total turn %.0f deg (max angle %.0f)"%(np.degrees(th[-1]),np.degrees(np.abs(th).max())))
 np.savetxt(os.path.join(a.out,"quality.csv"),np.array([(k,o,r,int(ok)) for k,(o,r,ok) in enumerate(q)]),fmt=["%d","%.3f","%.3f","%d"],header="frame_index,overlap,rms_mm,tracking_ok",delimiter=",")
 lost=[k for k,(o,r,ok) in enumerate(q) if not ok]
