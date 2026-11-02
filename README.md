@@ -37,6 +37,10 @@ Without `--no-mesh` it also writes a rough `mesh.obj` (needs scikit-image). That
 
 `poisson.py OUT_DIR` does the Poisson step with Open3D (`pip install open3d`) and trims surface invented over gaps. Untested by the author so far.
 
+
+## How fast may the object turn?
+Tracking was tested by re-running a finished recording with only every 2nd, 3rd, 4th ... frame (`python3 speedtest.py OUT_DIR calib.txt`). At the default `--step 3` on a 10 fps recording, the tracker follows turns of up to about 13 degrees per processed frame (about 40 degrees per second) without losing a frame; at 16 degrees per frame and above it loses the object. If you turn faster, use `--step 1` or `--step 2`. The frame-to-frame agreement of the fused scan is about 0.25 mm, and the scale agrees with JMStudio's mesh of the same figure to within 0.5%.
+
 ## Assumptions (what it will NOT handle yet)
 * Scanner fixed; object on a base turned by hand around ONE fixed axis. The object must turn 10-60 degrees in the first ~30 frames so the axis can be estimated.
 * Object closer than 40 cm, background further than about 45 cm (it separates them by depth).
@@ -48,4 +52,5 @@ Without `--no-mesh` it also writes a rough `mesh.obj` (needs scikit-image). That
 Tested on one scene: fused model within 0.73 mm (median) of JMStudio's scan of the same figure; about two thirds of JMStudio's surface covered.
 
 ## Privacy
+Do not commit your `calib.txt`, serial numbers or scan recordings to a public repo.
 Do not commit your `calib.txt`, serial numbers or scan recordings to a public repo.
