@@ -53,4 +53,21 @@ Tested on one scene: fused model within 0.73 mm (median) of JMStudio's scan of t
 
 ## Privacy
 Do not commit your `calib.txt`, serial numbers or scan recordings to a public repo.
-Do not commit your `calib.txt`, serial numbers or scan recordings to a public repo.
+
+## Graphical interface (all platforms)
+
+```
+python3 ui.py
+```
+
+Opens LibreScanner3D in your web browser (a small local server on 127.0.0.1; nothing leaves your computer, no internet needed).
+The page looks and works the same on macOS, Linux and Windows; use the **Quit** button in the page to stop the program.
+
+- **Scan**: add one recording folder per pose, choose calibration and output folder, press *Start scan*. Live log with stage indicator.
+- **Viewer**: own 3D viewer for clouds and meshes (drag = rotate, right-drag = pan, wheel = zoom).
+- **Tracking**: angle / overlap / RMS plots with lost frames marked, and a slider through the source frames.
+- **Tools**: merge, mesh only, compare with a reference mesh (`compare.py`), speed test, record.
+- **Settings**: default calibration, work folder, recorder script (saved in `~/.librescan3d/config.json`).
+
+Needs `numpy scipy pillow` (as the command line tools). The server only serves files inside your home folder, requires a random token and refuses other host names.
+Status: tested on Linux in a headless browser; **not yet tested on macOS or Windows**. The Record button runs `record.sh` (bash + ffmpeg + uvc-util), so it works on macOS/Linux only for now.
