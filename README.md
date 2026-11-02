@@ -1,6 +1,5 @@
 # LibreScanner3D (prototype)
 
-![Viewer](docs/screenshots/viewer.png)
 
 Raw striped frames from the Fox scanner -> depth -> tracked, fused point cloud (PLY).
 Independent of JMStudio; uses your own `calib.txt`.
@@ -8,6 +7,8 @@ Independent of JMStudio; uses your own `calib.txt`.
 ## Quick start: one command from frames to mesh
     python3 scan.py REC1 [REC2 ...] --calib calib.txt --out OUT [--depth 8] [--voxel 0.4]
 Each REC is a folder of `f_0001.png ...` (one turntable recording). `scan.py` runs `run.py` (decode + track + `--dense`), `mesh.py --no-mesh` (crop to the figure, normals), `merge.py` (when you give several recordings) and `poisson.py` (Poisson + trim + smoothing), and writes `OUT/poisson_mesh.ply`. Finished steps are skipped on a re-run. Needs `numpy scipy pillow` and, for the last step, `open3d` (Python 3.9-3.12).
+
+![Viewer](docs/screenshots/viewer.png)
 
 ### Several recordings of one object
 One turntable pass cannot see the top or underside. Record the object in two or three different poses and give all folders to `scan.py`; `merge.py` aligns them without markers. Tested: two passes of a larger figure fell onto each other within 0.4 mm (median).
