@@ -76,3 +76,9 @@ Status: tested on Linux in a headless browser; **not yet tested on macOS or Wind
 
 `ui.py` opens its own window when `pywebview` is installed (`pip install pywebview`), otherwise it falls back to the browser (`--browser` forces the browser). The window is the normal OS window, so closing works like any app (X on Windows, red dot on macOS); the Quit button does the same.
 Double-click launchers that set everything up on first start are in `launchers/` (`LibreScanner3D.command` macOS, `LibreScanner3D.bat` Windows, `librescanner3d-linux.sh` Linux). **Untested**: pywebview and the launchers could not be run where this was written. A frozen single-file app (PyInstaller) is not done yet: the scan jobs run as separate Python processes, which a frozen app has to be reworked for.
+
+### Stand-alone app (nothing to install)
+
+`build_app.py` packages Python, all libraries, the window and ffmpeg into one app (`LibreScanner3D.app` / `.exe` / Linux folder). The GitHub workflow `.github/workflows/build-app.yml` (Actions → *Build app* → *Run workflow*) builds all three systems and gives you the zips as downloads.
+Packaged, the scan steps are started as `LibreScanner3D --script NAME ...` (see `_exe.py`), so no separate Python is needed.
+**Untested**: this could not be run where it was written (no PyInstaller, no Mac/Windows). Expect a round or two of fixing after the first real build. The app is not code-signed: on macOS right-click → Open the first time (or `xattr -dr com.apple.quarantine LibreScanner3D.app`); Windows may show a SmartScreen warning. Camera exposure is built in (`uvc.py`, UVC over libusb; `python3 uvc.py --list` shows the cameras). It is untested on a real camera; if camera 0 and 1 come out swapped, set the environment variables CAM_A and CAM_B.

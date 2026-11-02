@@ -13,6 +13,7 @@ import argparse, json, mimetypes, os, re, secrets, signal, struct, subprocess, s
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 import numpy as np
+from _exe import pycmd
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WEB = os.path.join(HERE, "ui_web")
@@ -157,30 +158,30 @@ def need(p, kind="path"):
     return p
 
 def build_job(kind, a):
-    py = [sys.executable, "-u"]
     if kind == "scan":
         recs = [need(r) for r in a["recs"]]
         if not recs: raise ValueError("choose at least one recording folder")
         calib = need(a.get("calib") or CONF.get("calib") or ""); out = safe_path(a["out"])
-        cmd = py + [os.path.join(HERE, "scan.py")] + recs + ["--calib", calib, "--out", out, "--step", str(int(a.get("step", 3))),
-                                                            "--depth", str(int(a.get("depth", 8))), "--voxel", str(float(a.get("voxel", 0.4))), "--jobs", str(int(a.get("jobs", 4)))]
+        cmd = pycmd("scan.py", *recs, "--calib", calib, "--out", out, "--step", str(int(a.get("step", 3))),
+                                                            "--depth", str(int(a.get("depth", 8))), "--voxel", str(float(a.get("voxel", 0.4))), "--jobs", str(int(a.get("jobs", 4))))
         if a.get("no_poisson"): cmd.append("--no-poisson")
         return cmd, "Scan " + os.path.basename(recs[0]) + (" + %d more" % (len(recs) - 1) if len(recs) > 1 else "")
     if kind == "merge":
-        cmd = py + [os.path.join(HERE, "merge.py"), need(a["a"]), need(a["b"]), safe_path(a["out"])]
+        cmd = pycmd("merge.py", need(a["a"]), need(a["b"]), safe_path(a["out"]))
         if a.get("fpfh"): cmd.append("--fpfh")
         if a.get("partial"): cmd.append("--partial")
         return cmd, "Merge"
     if kind == "poisson":
-        return py + [os.path.join(HERE, "poisson.py"), need(a["dir"]), "--depth", str(int(a.get("depth", 8))), "--voxel", str(float(a.get("voxel", 0.4))),
-                     "--trim", str(float(a.get("trim", 0.05))), "--smooth", str(int(a.get("smooth", 10)))], "Mesh (Poisson)"
+        return pycmd("poisson.py", need(a["dir"]), "--depth", str(int(a.get("depth", 8))), "--voxel", str(float(a.get("voxel", 0.4))),
+                     "--trim", str(float(a.get("trim", 0.05))), "--smooth", str(int(a.get("smooth", 10)))), "Mesh (Poisson)"
     if kind == "compare":
-        return py + [os.path.join(HERE, "compare.py"), need(a["a"]), need(a["b"])], "Compare"
+        return pycmd("compare.py", need(a["a"]), need(a["b"])), "Compare"
     if kind == "speedtest":
-        return py + [os.path.join(HERE, "speedtest.py"), need(a["dir"]), need(a.get("calib") or CONF.get("calib") or "")], "Speed test"
+        return pycmd("speedtest.py", need(a["dir"]), need(a.get("calib") or CONF.get("calib") or "")), "Speed test"
     if kind == "record":
-        sh = a.get("record_sh") or CONF.get("record_sh") or os.path.join(HERE, "record.py")
-        if sh.lower().endswith(".py"): return py + [need(sh), safe_path(a["out"])], "Record"
+        sh = a.get("record_sh") or CONF.get("record_sh")
+        if not sh: return pycmd("record.py", safe_path(a["out"])), "Record"
+        if sh.lower().endswith(".py"): return [sys.executable, "-u", need(sh), safe_path(a["out"])], "Record"
         if os.name == "nt": raise ValueError("record.sh needs bash (macOS/Linux); a cross-platform recorder is planned")
         return ["bash", need(sh), safe_path(a["out"])], "Record"
     raise ValueError("unknown job kind")
@@ -193,7 +194,7 @@ def start_job(kind, a):
         j = {"id": jid, "kind": kind, "title": title, "cmd": cmd, "lines": [], "status": "running", "t0": time.time(), "t1": None, "rc": None, "out": a.get("out") or a.get("dir")}
         JOBS[jid] = j
     try:
-        extra = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
+        extra = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {"start_new_session": True}
         j["proc"] = subprocess.Popen(cmd, cwd=HERE, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, encoding="utf-8", errors="replace", **extra)
     except Exception as e:
         j["status"] = "failed"; j["lines"].append("could not start: %s" % e); j["t1"] = time.time(); return j
@@ -335,4 +336,7 @@ def main():
     finally: cleanup()
 
 if __name__ == "__main__":
+    if sys.stdout is None: sys.stdout = sys.stderr = open(os.devnull, "w")  # windowed packaged app has no console
+    if len(sys.argv) > 2 and sys.argv[1] == "--script":  # packaged app: run one of our scripts as "python script.py ..."
+        import runpy; name = sys.argv[2]; sys.argv = [name] + sys.argv[3:]; runpy.run_module(os.path.splitext(name)[0], run_name="__main__"); sys.exit(0)
     main()

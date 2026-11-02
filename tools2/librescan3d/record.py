@@ -24,21 +24,29 @@ def list_devices():
     except FileNotFoundError: print("%s not found; install it first" % cmd[0])
 
 def set_exposure(exp, dry):
-    """Best effort; returns a note for the log."""
+    """Best effort; returns a note for the log. macOS/Linux: built-in UVC control (uvc.py), then uvc-util / v4l2-ctl if present."""
     def run(c):
         print("$", " ".join(c))
         if not dry: subprocess.run(c, capture_output=True)
+    cam_a, cam_b = int(os.environ.get("CAM_A", 0)), int(os.environ.get("CAM_B", 1))
+    if dry and sys.platform != "win32": print("(dry run) would set exposure %d on camera %d and 5 on camera %d with uvc.py" % (exp, cam_a, cam_b)); return "dry run"
+    if sys.platform != "win32":
+        try:
+            import uvc
+            if uvc.set_scanner_exposure(exp, 5, cam_a, cam_b, log=print): return "exposure set (built-in UVC control). Check the camera list above: camera %d must be the striped one (set CAM_A/CAM_B otherwise)" % cam_a
+        except SystemExit as e: print("built-in camera control unavailable:", e)
+        except Exception as e: print("built-in camera control failed:", e)
     if sys.platform == "darwin":
         uvc = os.environ.get("UVC", os.path.expanduser("~/uvc-util/src/uvc-util"))
-        if not os.path.exists(uvc) and not dry: return "uvc-util not found: exposure left as is"
-        for i, e in ((0, exp), (1, 5)):
+        if not os.path.exists(uvc): return "uvc-util not found: exposure left as is"
+        for i, e in ((cam_a, exp), (cam_b, 5)):
             run([uvc, "-I", str(i), "-s", "auto-exposure-mode=1"]); run([uvc, "-I", str(i), "-s", "exposure-time-abs=%d" % e]); run([uvc, "-I", str(i), "-s", "gain=0"])
         return "exposure set with uvc-util"
     if sys.platform.startswith("linux"):
-        if not shutil.which("v4l2-ctl") and not dry: return "v4l2-ctl not found: exposure left as is"
+        if not shutil.which("v4l2-ctl"): return "v4l2-ctl not found: exposure left as is"
         dev = os.environ.get("V4L2_DEV", "/dev/video0")
-        run(["v4l2-ctl", "-d", dev, "-c", "auto_exposure=1,exposure_time_absolute=%d,gain=0" % exp]); return "exposure set with v4l2-ctl (values may need adjusting, Linux is untested)"
-    return "exposure not automated on this system: set it low in the camera settings"
+        run(["v4l2-ctl", "-d", dev, "-c", "auto_exposure=1,exposure_time_absolute=%d,gain=0" % exp]); return "exposure set with v4l2-ctl"
+    return "exposure not automated on Windows: set it low in the camera settings"
 
 def is_striped(png):
     from chk_stripes import check
@@ -49,8 +57,11 @@ def main():
     ap.add_argument("--exp", type=int, default=int(os.environ.get("EXP", 25))); ap.add_argument("--list", action="store_true"); ap.add_argument("--dry-run", action="store_true"); a = ap.parse_args()
     if a.list: return list_devices()
     if not a.out: ap.error("OUT_DIR required")
-    ff = os.environ.get("FFMPEG", "ffmpeg")
-    if not shutil.which(ff) and not a.dry_run: raise SystemExit("ffmpeg not found; install it first")
+    ff = os.environ.get("FFMPEG") or shutil.which("ffmpeg")
+    if not ff:
+        try: import imageio_ffmpeg; ff = imageio_ffmpeg.get_ffmpeg_exe()  # ffmpeg that ships inside the packaged app
+        except Exception: ff = "ffmpeg"
+    if not (os.path.exists(ff) or shutil.which(ff)) and not a.dry_run: raise SystemExit("ffmpeg not found; install it first")
     os.makedirs(a.out, exist_ok=True); print(set_exposure(a.exp, a.dry_run))
     def cap(extra, name): 
         c = [ff, "-loglevel", "error", "-y"] + ff_input(a.device) + extra + ["-pix_fmt", "gray", name]; print("$", " ".join(c))

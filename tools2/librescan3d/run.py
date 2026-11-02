@@ -5,6 +5,7 @@ usage: python3 run.py FRAMES_DIR CALIB.txt OUT_DIR [--step 3] [--jobs 4]
 FRAMES_DIR holds f_0001.png, f_0002.png ... (striped frames, gray, 1280x720).
 """
 import argparse, glob, os, subprocess, sys
+from _exe import pycmd
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 import track as T
@@ -19,7 +20,7 @@ print(len(frames),"frames to decode")
 def run(f):
     pre=os.path.join(dec,"d_"+os.path.basename(f)[2:6])
     if not os.path.exists(pre+"_samples.npy"):
-        subprocess.run([sys.executable,"-I",os.path.join(here,"decode_frame.py"),f,a.calib,os.path.join(here,"ref30.csv"),pre],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,cwd=here)
+        subprocess.run(pycmd("decode_frame.py",f,a.calib,os.path.join(here,"ref30.csv"),pre,flags=("-I",)),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,cwd=here)
 with ThreadPoolExecutor(a.jobs) as ex: list(ex.map(run,frames))
 T.load_camera(a.calib)
 rows,xr=T.load_ref(os.path.join(here,"ref30.csv"))

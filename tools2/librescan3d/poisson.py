@@ -5,6 +5,7 @@ Without OUT_DIR it uses the folder this script is in (put points_normals.ply nex
 Needs: python3 -m pip install open3d   (Open3D may not support the newest Python versions; use 3.9-3.12)
 Writes OUT_DIR/poisson_mesh.ply.  NOTE: written without being able to run it on the author's machine - report problems."""
 import argparse, os, subprocess, sys, time, numpy as np
+from _exe import pycmd
 ap=argparse.ArgumentParser(); ap.add_argument("out",nargs="?",default=os.path.dirname(os.path.abspath(__file__))); ap.add_argument("--depth",type=int,default=8)
 ap.add_argument("--min-piece",type=float,default=0.05,help="drop connected pieces smaller than this fraction of the largest piece (0 = keep all)")
 ap.add_argument("--min-neighbors",type=int,default=15,help="drop points with fewer than this many neighbours within 2 mm (removes streaks and strays; 0 = off)")
@@ -54,7 +55,7 @@ if not a.child:
     # Open3D's Poisson can abort the whole process ("Failed to close loop"), so run it in a child process and retry coarser
     t0=time.time(); outf=os.path.join(a.out,"poisson_mesh.ply")
     for d,vx in ((a.depth,a.voxel),(a.depth,a.voxel*1.5),(a.depth-1,a.voxel),(a.depth-1,a.voxel*1.5),(a.depth-2,a.voxel*1.5),(a.depth-2,a.voxel*2.2)):   # keep the detail level (depth) as long as possible
-        cmd=[sys.executable,os.path.abspath(__file__),a.out,"--depth",str(d),"--trim",str(a.trim),"--min-piece",str(a.min_piece),"--voxel",str(round(vx,2)),"--min-neighbors",str(a.min_neighbors),"--smooth",str(a.smooth),"--child"]
+        cmd=pycmd("poisson.py",a.out,"--depth",str(d),"--trim",str(a.trim),"--min-piece",str(a.min_piece),"--voxel",str(round(vx,2)),"--min-neighbors",str(a.min_neighbors),"--smooth",str(a.smooth),"--child")
         rc=subprocess.run(cmd).returncode
         if rc==0 and os.path.exists(outf) and os.path.getmtime(outf)>=t0: raise SystemExit(0)   # success only if a new file was written
         print("depth %d / thinning %.2f mm failed, trying coarser settings"%(d,vx),flush=True)
