@@ -1,5 +1,6 @@
 # LibreScanner3D (prototype)
 
+![Viewer](docs/screenshots/viewer.png)
 
 Raw striped frames from the Fox scanner -> depth -> tracked, fused point cloud (PLY).
 Independent of JMStudio; uses your own `calib.txt`.
@@ -18,6 +19,11 @@ One turntable pass cannot see the top or underside. Record the object in two or 
 ## Install (macOS, Apple Silicon)
     python3 -m pip install numpy scipy pillow
 
+| Tools | Job running |
+|---|---|
+| ![Tools](docs/screenshots/tools.png) | ![Job running](docs/screenshots/job-running.png) |
+
+
 ## Run
     python3 run.py FRAMES_DIR /path/to/calib.txt OUT_DIR [--step 3] [--jobs 4]
 
@@ -25,6 +31,10 @@ One turntable pass cannot see the top or underside. Record the object in two or 
 * OUT_DIR gets `samples/` (per-frame depth), `fused.ply`, `angles_deg.csv` and `quality.csv`.
 * `quality.csv` has one row per frame: overlap with the model so far, leftover error (mm) and `tracking_ok`. Frames flagged lost (overlap < 0.6 or error > 2 mm) are not added to the model; the run prints which ones. If the turning axis cannot be estimated reliably, the run stops with an error instead of producing a bad model.
 * About 8 minutes for 300 frames at --step 3 on the test machine. Decoding is the slow part and is cached in `samples/`.
+
+| Scan | Tracking |
+|---|---|
+| ![Scan](docs/screenshots/scan.png) | ![Tracking](docs/screenshots/tracking.png) |
 
 ## Optional: --guided
 `--guided` adds a second pass that predicts each stripe's depth from the fused model and decodes with that hint, writing `fused_guided.ply`. On the test scene it gave about 3x the points and raised the share of the vendor scan's surface covered to within 2 mm from 57% to 70%, but its points are a little less accurate (median distance to the vendor scan 1.2 mm instead of 0.9 mm). It only fills in surfaces the model already has; it cannot find new geometry.
