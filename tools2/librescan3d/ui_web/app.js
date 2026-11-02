@@ -1,4 +1,5 @@
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+function notify(m){let t=document.getElementById('toast');if(!t){t=document.createElement('div');t.id='toast';document.body.appendChild(t);}t.textContent=m;t.className='show';clearTimeout(t._t);t._t=setTimeout(()=>t.className='',6000);}
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 async function api(ep, params = {}, body = null) {
   const q = new URLSearchParams({...params, t: window.TOKEN});
@@ -17,7 +18,7 @@ const remember = () => { try { localStorage.setItem('ls3d', JSON.stringify(last)
 function showTab(n) { $$('.tab').forEach(e => e.classList.toggle('on', e.id === n)); $$('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === n));
   if (n === 'view') { ensureViewer(); loadProjects(); viewer && viewer.draw(); } if (n === 'track') fillTrackSel(); }
 $$('#tabs button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
-$('#quit').onclick = async () => { if (!confirm('Stop LibreScanner3D? Running jobs will be stopped.')) return; try { await api('quit'); } catch (e) {} document.body.innerHTML = '<p style="padding:40px;font:16px system-ui">LibreScanner3D has stopped. You can close this tab.</p>'; };
+$('#quit').onclick = async () => { const q = $('#quit'); if (!q.dataset.arm) { q.dataset.arm = 1; q.textContent = 'Click again to quit'; setTimeout(() => { delete q.dataset.arm; q.textContent = 'Quit'; }, 3000); return; } try { await api('quit'); } catch (e) {} document.body.innerHTML = '<p style="padding:40px;font:16px system-ui">LibreScanner3D has stopped. You can close this tab.</p>'; };
 
 // ---------------------------------------------------------------- folder / file picker
 function pick(kind, start) {
@@ -34,7 +35,7 @@ function pick(kind, start) {
       } catch (e) { $('#mo_path').textContent = 'Cannot open: ' + e.message; }
     }
     $('#mo_up').onclick = () => cur && cur.parent && go(cur.parent); $('#mo_ok').onclick = () => cur && done(cur.path); $('#mo_close').onclick = () => done(null);
-    $('#mo_new').onclick = async () => { const n = prompt('Name of the new folder'); if (!n || !cur) return; try { await postJ('mkdir', {path: cur.path + sep() + n}); go(cur.path + sep() + n); } catch (e) { alert(e.message); } };
+    $('#mo_new').onclick = async () => { const n = $('#mo_name').value.trim(); if (!n || !cur) { notify('Type a name in the box first'); return; } try { await postJ('mkdir', {path: cur.path + sep() + n}); go(cur.path + sep() + n); } catch (e) { notify(e.message); } };
     go(start || last.dir || '');
   });
 }
@@ -46,7 +47,7 @@ function toggleDrawer(open) { $('#drawer').classList.toggle('closed', open === u
 $('#d_toggle').onclick = () => toggleDrawer();
 async function startJob(kind, body) {
   try { const j = await postJ('run', {kind, ...body}); curJob = {id: j.id, from: 0, lines: [], kind, out: j.out}; $('#d_log').textContent = ''; toggleDrawer(true); poll(); }
-  catch (e) { alert(e.message); }
+  catch (e) { notify(e.message); }
 }
 async function poll() {
   clearTimeout(pollTimer); if (!curJob) return;
@@ -66,7 +67,7 @@ $('#d_open').onclick = async () => { showTab('view'); await loadProjects(); cons
 // ---------------------------------------------------------------- scan tab
 const recs = [];
 function drawRecs() { const d = $('#recs'); d.innerHTML = ''; recs.forEach((r, i) => { const e = document.createElement('div'); e.className = 'rec'; e.innerHTML = '<b>Pose ' + (i + 1) + '</b><span title="' + esc(r.path) + '">' + esc(r.path) + '</span><small class="hint">' + r.frames + ' frames</small>'; const x = document.createElement('button'); x.className = 'ghost'; x.textContent = '✕'; x.onclick = () => { recs.splice(i, 1); drawRecs(); }; e.appendChild(x); d.appendChild(e); }); if (!recs.length) d.innerHTML = '<p class="hint">None yet.</p>'; }
-$('#addrec').onclick = async () => { const p = await pick('dir'); if (!p) return; try { const d = await getJ('browse', {path: p}); if (!d.frames) { alert('That folder has no frames (f_0001.png …). Choose the folder that contains them.'); return; } recs.push({path: d.path, frames: d.frames}); if (!$('#s_out').value) $('#s_out').value = (S.conf.work || S.home) + sep() + base(d.path) + '_result'; drawRecs(); } catch (e) { alert(e.message); } };
+$('#addrec').onclick = async () => { const p = await pick('dir'); if (!p) return; try { const d = await getJ('browse', {path: p}); if (!d.frames) { notify('That folder has no frames (f_0001.png …). Choose the folder that contains them.'); return; } recs.push({path: d.path, frames: d.frames}); if (!$('#s_out').value) $('#s_out').value = (S.conf.work || S.home) + sep() + base(d.path) + '_result'; drawRecs(); } catch (e) { notify(e.message); } };
 $('#s_run').onclick = () => { const m = $('#s_msg'); m.textContent = '';
   if (!recs.length) return m.textContent = 'Add at least one recording folder.'; if (!$('#s_calib').value) return m.textContent = 'Choose the calibration file.'; if (!$('#s_out').value) return m.textContent = 'Choose an output folder.';
   startJob('scan', {recs: recs.map(r => r.path), calib: $('#s_calib').value, out: $('#s_out').value, step: +$('#s_step').value, depth: +$('#s_depth').value, voxel: +$('#s_voxel').value, jobs: +$('#s_jobs').value, no_poisson: $('#s_nop').checked}); };
@@ -118,7 +119,7 @@ let frameTok = 0; async function showFrame(i) { const k = ++frameTok; $('#t_fi')
 $('#t_load').onclick = loadTracking; $('#t_slider').oninput = e => showFrame(+e.target.value);
 
 // ---------------------------------------------------------------- tools
-const need = (ids, m) => { for (const i of ids) if (!$('#' + i).value) { alert(m); return false; } return true; };
+const need = (ids, m) => { for (const i of ids) if (!$('#' + i).value) { notify(m); return false; } return true; };
 $('#m_run').onclick = () => need(['m_a', 'm_b', 'm_out'], 'Choose both scans and an output folder.') && startJob('merge', {a: $('#m_a').value, b: $('#m_b').value, out: $('#m_out').value, partial: $('#m_partial').checked, fpfh: $('#m_fpfh').checked});
 $('#p_run').onclick = () => need(['p_dir'], 'Choose the folder.') && startJob('poisson', {dir: $('#p_dir').value, depth: +$('#p_depth').value, voxel: +$('#p_voxel').value, trim: +$('#p_trim').value, smooth: +$('#p_smooth').value});
 $('#c_run').onclick = () => need(['c_a', 'c_b'], 'Choose both files.') && startJob('compare', {a: $('#c_a').value, b: $('#c_b').value});

@@ -179,8 +179,7 @@ def build_job(kind, a):
     if kind == "speedtest":
         return py + [os.path.join(HERE, "speedtest.py"), need(a["dir"]), need(a.get("calib") or CONF.get("calib") or "")], "Speed test"
     if kind == "record":
-        sh = a.get("record_sh") or CONF.get("record_sh")
-        if not sh: raise ValueError("set the path of record.sh in Settings first")
+        sh = a.get("record_sh") or CONF.get("record_sh") or os.path.join(HERE, "record.py")
         if sh.lower().endswith(".py"): return py + [need(sh), safe_path(a["out"])], "Record"
         if os.name == "nt": raise ValueError("record.sh needs bash (macOS/Linux); a cross-platform recorder is planned")
         return ["bash", need(sh), safe_path(a["out"])], "Record"
@@ -307,7 +306,8 @@ class H(BaseHTTPRequestHandler):
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--port", type=int, default=8765); ap.add_argument("--work", default=None)
-    ap.add_argument("--no-browser", action="store_true"); a = ap.parse_args()
+    ap.add_argument("--browser", action="store_true", help="open in the web browser instead of an own window")
+    ap.add_argument("--no-browser", action="store_true", help="do not open anything (server only)"); a = ap.parse_args()
     if a.work: CONF["work"] = os.path.expanduser(a.work)
     srv = None
     for port in range(a.port, a.port + 20):
@@ -316,11 +316,23 @@ def main():
     if srv is None: raise SystemExit("no free port")
     url = "http://127.0.0.1:%d/" % srv.server_address[1]
     print("LibreScanner3D interface: " + url + "   (stop with Ctrl-C)", flush=True)
+    def cleanup():
+        for j in JOBS.values(): stop_job(j["id"])
+    if not a.no_browser and not a.browser:
+        try:
+            import webview  # pywebview: native window (WKWebView on macOS, WebView2 on Windows, GTK/Qt WebKit on Linux)
+        except Exception:
+            webview = None; print("pywebview not installed: opening in the browser instead (pip install pywebview for an own window)")
+        if webview:
+            threading.Thread(target=srv.serve_forever, daemon=True).start()
+            webview.create_window("LibreScanner3D", url, width=1360, height=860, min_size=(900, 600))
+            try: webview.start()
+            finally: cleanup()
+            return
     if not a.no_browser: threading.Timer(0.5, lambda: webbrowser.open(url)).start()
     try: srv.serve_forever()
     except KeyboardInterrupt: print("bye")
-    finally:
-        for j in JOBS.values(): stop_job(j["id"])
+    finally: cleanup()
 
 if __name__ == "__main__":
     main()

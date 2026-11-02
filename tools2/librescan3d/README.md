@@ -70,4 +70,9 @@ The page looks and works the same on macOS, Linux and Windows; use the **Quit** 
 - **Settings**: default calibration, work folder, recorder script (saved in `~/.librescan3d/config.json`).
 
 Needs `numpy scipy pillow` (as the command line tools). The server only serves files inside your home folder, requires a random token and refuses other host names.
-Status: tested on Linux in a headless browser; **not yet tested on macOS or Windows**. The Record button runs `record.sh` (bash + ffmpeg + uvc-util), so it works on macOS/Linux only for now.
+Status: tested on Linux in a headless browser; **not yet tested on macOS or Windows**. The Record button runs `record.py` (ffmpeg; exposure via uvc-util on macOS, v4l2-ctl on Linux; on Windows set exposure low in the camera settings yourself). `python3 record.py --list` shows the camera numbers/names. Only the macOS path is based on a verified script; Linux and Windows are untested.
+
+### Own window instead of the browser
+
+`ui.py` opens its own window when `pywebview` is installed (`pip install pywebview`), otherwise it falls back to the browser (`--browser` forces the browser). The window is the normal OS window, so closing works like any app (X on Windows, red dot on macOS); the Quit button does the same.
+Double-click launchers that set everything up on first start are in `launchers/` (`LibreScanner3D.command` macOS, `LibreScanner3D.bat` Windows, `librescanner3d-linux.sh` Linux). **Untested**: pywebview and the launchers could not be run where this was written. A frozen single-file app (PyInstaller) is not done yet: the scan jobs run as separate Python processes, which a frozen app has to be reworked for.
